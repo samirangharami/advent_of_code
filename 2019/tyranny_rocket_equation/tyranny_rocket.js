@@ -1,6 +1,4 @@
-const feulRequired = (mass) => {
-  mass / 3 - 2;
-};
+const feulRequired = (mass) => mass / 3 - 2;
 
 const sum = (x, y) => x + y;
 
