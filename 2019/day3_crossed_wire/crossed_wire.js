@@ -1,4 +1,4 @@
-import { intersect, runningReduce } from "@std/collections";
+import { runningReduce } from "@std/collections";
 
 const findPath = (movements) => {
   return runningReduce(movements, (path, movement) => {
