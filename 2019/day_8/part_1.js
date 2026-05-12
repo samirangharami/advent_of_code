@@ -21,25 +21,19 @@ const getProduct = (layer) => {
     return acc;
   }, { "1": 0, "2": 0 });
 
-  console.log(counts);
-  
-
   return counts["1"] * counts["2"];
 };
 
 const main = (rawImage) => {
   const image = {};
 
-  for (
-    let pixelNumber = 0;
-    pixelNumber < rawImage.length;
-    pixelNumber += imageLayerSize
-  ) {
+  for (let pixelNumber = 0;pixelNumber < rawImage.length;pixelNumber += imageLayerSize) {
     const layer = rawImage.slice(pixelNumber, pixelNumber + imageLayerSize);
     image[getZeroCount(layer)] = layer;
   }
 
   const layerWithFewestZero = getLayerWithFewestZeros(image);
+  
   console.log(getProduct(layerWithFewestZero));
 };
 
