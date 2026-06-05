@@ -1,118 +1,128 @@
-import { permutations } from "jsr:@std/collections";
+import IntcodeComputer from "./intcodeComputer.js";
 
-const add = (num1, num2) => num1 + num2;
-const mul = (num1, num2) => num1 * num2;
-const operations = { 1: add, 2: mul };
-const performOperation = (operation, num1, num2) => operation(num1, num2);
+const input = Deno.readTextFileSync("input.txt");
 
-const performOpCode1And2 = (
-  codes,
-  opCode,
-  parameter1,
-  parameter2,
-  parameter3,
-) => {
-  const fullOpCode = (opCode.toString()).padStart(5, "0");
-  const num2 = (fullOpCode[1] === "0") ? codes[parameter2] : parameter2;
-  const num1 = (fullOpCode[2] === "0") ? codes[parameter1] : parameter1;
+const parseProgram = (rawInput) => rawInput.trim().split(",").map(Number);
 
-  codes[parameter3] = performOperation(
-    operations[fullOpCode.at(-1)],
-    num1,
-    num2,
+const getPermutations = (arr) => {
+  if (arr.length === 1) return [arr];
+
+  const permutations = [];
+
+  arr.forEach((value, index) => {
+    const remaining = [...arr.slice(0, index), ...arr.slice(index + 1)];
+
+    const subPermutations = getPermutations(remaining);
+
+    subPermutations.forEach((perm) => {
+      permutations.push([value, ...perm]);
+    });
+  });
+
+  return permutations;
+};
+
+const runAmplifierChain = (program, phases) => {
+  let signal = 0;
+
+  phases.forEach((phase) => {
+    const computer = new IntcodeComputer(program, [phase, signal]);
+
+    signal = computer.runUntilOutput();
+  });
+
+  return signal;
+};
+
+const findMaxThrusterSignal = (program) => {
+  const permutations = getPermutations([0, 1, 2, 3, 4]);
+
+  let maxSignal = 0;
+
+  permutations.forEach((phases) => {
+    const signal = runAmplifierChain(program, phases);
+
+    maxSignal = Math.max(maxSignal, signal);
+  });
+
+  return maxSignal;
+};
+
+const createAmplifiers = (
+  program,
+  phases,
+) =>
+  phases.map(
+    (phase) => new IntcodeComputer(program, [phase]),
   );
-};
 
-const performOpCode5And6 = (codes, opCode, parameter1, parameter2, index) => {
-  const fullOpCode = opCode.toString().padStart(4, "0");
-
-  const addressToJump = (fullOpCode[0] === "0")
-    ? codes[parameter2]
-    : parameter2;
-  const numtoCheck = (fullOpCode[1] === "0") ? codes[parameter1] : parameter1;
-
-  if (fullOpCode.at(-1) === "5") {
-    return numtoCheck !== 0 ? addressToJump - 2 : index + 1;
-  }
-
-  if (fullOpCode.at(-1) === "6") {
-    return numtoCheck === 0 ? addressToJump - 2 : index + 1;
-  }
-};
-
-const performOpCode7And8 = (
-  codes,
-  opCode,
-  parameter1,
-  parameter2,
-  parameter3,
+const runFeedbackLoop = (
+  program,
+  phases,
 ) => {
-  const fullOpCode = (opCode.toString()).padStart(5, "0");
+  const amplifiers = createAmplifiers(
+    program,
+    phases,
+  );
 
-  const num2 = (fullOpCode[1] === "0") ? codes[parameter2] : parameter2;
-  const num1 = (fullOpCode[2] === "0") ? codes[parameter1] : parameter1;
+  let signal = 0;
+  let lastOutput = 0;
+  let index = 0;
 
-  if (fullOpCode.at(-1) === "7") codes[parameter3] = num1 < num2 ? 1 : 0;
-  if (fullOpCode.at(-1) === "8") codes[parameter3] = num1 === num2 ? 1 : 0;
+  while (!amplifiers[4].halted) {
+    const amplifier = amplifiers[index];
+
+    amplifier.inputs.push(signal);
+
+    const output = amplifier.runUntilOutput();
+
+    if (output !== null) {
+      signal = output;
+
+      if (index === 4) {
+        lastOutput = output;
+      }
+    }
+
+    index = (index + 1) % 5;
+  }
+
+  return lastOutput;
 };
 
-const programAlarm = (program, phaseSetting, input, startingIndex = 0) => {
-  const codes = program.split(",").map((code) => parseInt(code));
+const findMaxFeedbackSignal = (program) => {
+  const permutations = getPermutations([
+    5,
+    6,
+    7,
+    8,
+    9,
+  ]);
 
-  let count = 0;
-  for (let index = startingIndex; index < codes.length; index += 2) {
-    const opCode = codes[index];
-    const parameter1 = codes[index + 1];
-    const parameter2 = codes[index + 2];
-    const parameter3 = codes[index + 3];
+  let maxSignal = 0;
 
-    if ((opCode % 10 === 1) || (opCode % 10 === 2)) {
-      performOpCode1And2(codes, opCode, parameter1, parameter2, parameter3);
-      index += 2;
-    }
-    if ((opCode % 10 === 5) || (opCode % 10 === 6)) {
-      index = performOpCode5And6(codes, opCode, parameter1, parameter2, index);
-    }
-    if ((opCode % 10 === 7) || (opCode % 10 === 8)) {
-      performOpCode7And8(codes, opCode, parameter1, parameter2, parameter3);
-      index += 2;
-    }
+  permutations.forEach((phases) => {
+    const signal = runFeedbackLoop(program, phases);
 
-    if (opCode === 4) {
-      return { output: codes[parameter1], index: index + 1 };
-    }
-    if (opCode === 3) {
-      codes[parameter1] = count === 0 ? phaseSetting : input;
-      count++;
-    }
-    if (opCode === 99) break;
-  }
+    maxSignal = Math.max(maxSignal, signal);
+  });
+
+  return maxSignal;
 };
 
-const phaseSettingCombinations = permutations([5, 6, 7, 8, 9]);
+const printResults = (part1, part2) => {
+  console.log("Part 1:", part1);
+  console.log("Part 2:", part2);
+};
 
+const main = () => {
+  const program = parseProgram(input);
 
-const software =
-  `3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,-5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10`;
+  const part1 = findMaxThrusterSignal(program);
 
-const outputs = phaseSettingCombinations.map((phaseSettings) => {
-  const input = [];
-  let count = 0;
-  for (let index = 0; index < phaseSettings.length; index++) {
-    if (count) {
-      input.push(
-        programAlarm(software, phaseSettings[index], input[index - 1].output),
-      );
-    } else {
-      input.push(programAlarm(software, phaseSettings[index], 0));
-      count++;
-    }
-  }
-  return input;
-});
+  const part2 = findMaxFeedbackSignal(program);
 
-console.log(outputs);
+  printResults(part1, part2);
+};
 
-const highestOutput = outputs.reduce((largestOutput, CurrOutput, i) => {
-  if (CurrOutput[4].output > outputs[largestOutput][4].output) return i;
-}, 0);
+main();
